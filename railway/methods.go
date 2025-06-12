@@ -1,7 +1,10 @@
 package railway
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/ferretcode/locomotive/util"
 )
@@ -41,4 +44,35 @@ func FilterLogs(logs []EnvironmentLog, wantedLevel []string, contentFilter strin
 	}
 
 	return filteredLogs
+}
+
+// GetAllServicesInEnvironment returns all service IDs for a given project and environment
+func (g *GraphQLClient) GetAllServicesInEnvironment(ctx context.Context, projectId, environmentId string) ([]string, error) {
+	if g.client == nil {
+		return nil, errors.New("client is nil")
+	}
+
+	project := &Project{}
+
+	variables := map[string]any{
+		"id": projectId,
+	}
+
+	if err := g.client.Exec(ctx, projectQuery, &project, variables); err != nil {
+		return nil, fmt.Errorf("error fetching project: %w", err)
+	}
+
+	var serviceIds []string
+
+	// Find all services that have instances in the specified environment
+	for _, service := range project.Project.Services.Edges {
+		for _, instance := range service.Node.ServiceInstances.Edges {
+			if instance.Node.EnvironmentID == environmentId {
+				serviceIds = append(serviceIds, service.Node.ID)
+				break // Only add the service ID once, even if it has multiple instances
+			}
+		}
+	}
+
+	return serviceIds, nil
 }

@@ -34,8 +34,12 @@ func (h *AdditionalHeaders) UnmarshalText(envByte []byte) error {
 
 type Config struct {
 	RailwayApiKey string   `env:"RAILWAY_API_KEY,required"`
-	EnvironmentId string   `env:"ENVIRONMENT_ID,required"`
-	Train         []string `env:"TRAIN,required" envSeparator:","`
+	ProjectId     string   `env:"RAILWAY_PROJECT_ID"`
+	EnvironmentId string   `env:"RAILWAY_ENVIRONMENT_ID"`
+	Train         []string `env:"TRAIN" envSeparator:","`
+
+	// Fallback for backward compatibility - can be either old ENVIRONMENT_ID or new RAILWAY_ENVIRONMENT_ID
+	LegacyEnvironmentId string `env:"ENVIRONMENT_ID"`
 
 	DiscordWebhookUrl string `env:"DISCORD_WEBHOOK_URL"`
 	DiscordPrettyJson bool   `env:"DISCORD_PRETTY_JSON" envDefault:"false"`
@@ -70,6 +74,26 @@ func GetConfig() (*Config, error) {
 
 	if err := env.Parse(&config); err != nil {
 		return nil, err
+	}
+
+	// Handle backward compatibility - use LegacyEnvironmentId if EnvironmentId is not set
+	if config.EnvironmentId == "" && config.LegacyEnvironmentId != "" {
+		config.EnvironmentId = config.LegacyEnvironmentId
+	}
+
+	// Validate that we have either both ProjectId and EnvironmentId or just EnvironmentId
+	if config.ProjectId != "" && config.EnvironmentId == "" {
+		return nil, errors.New("RAILWAY_ENVIRONMENT_ID is required when RAILWAY_PROJECT_ID is specified")
+	}
+
+	if config.ProjectId == "" && config.EnvironmentId == "" {
+		return nil, errors.New("either RAILWAY_ENVIRONMENT_ID or ENVIRONMENT_ID must be specified")
+	}
+
+	// If ProjectId is specified but no Train services, we'll auto-discover them
+	// If only EnvironmentId is specified, Train services must be provided (backward compatibility)
+	if config.ProjectId == "" && len(config.Train) == 0 {
+		return nil, errors.New("TRAIN services must be specified when using ENVIRONMENT_ID (backward compatibility mode)")
 	}
 
 	if config.DiscordWebhookUrl != "" && !strings.HasPrefix(config.DiscordWebhookUrl, "https://discord.com/api/webhooks/") {

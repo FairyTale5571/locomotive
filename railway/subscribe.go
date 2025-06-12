@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/ferretcode/locomotive/config"
 	"github.com/ferretcode/locomotive/logger"
 	"github.com/ferretcode/locomotive/util"
 	"github.com/google/uuid"
-	"nhooyr.io/websocket"
 )
 
 func (g *GraphQLClient) buildMetadataMap(ctx context.Context, cfg *config.Config) (map[string]string, error) {
@@ -22,20 +22,29 @@ func (g *GraphQLClient) buildMetadataMap(ctx context.Context, cfg *config.Config
 		return nil, errors.New("client is nil")
 	}
 
-	environment := &Environment{}
+	var projectId string
 
-	variables := map[string]any{
-		"id": cfg.EnvironmentId,
-	}
+	// If we have ProjectId directly, use it. Otherwise, get it from EnvironmentId
+	if cfg.ProjectId != "" {
+		projectId = cfg.ProjectId
+	} else {
+		environment := &Environment{}
 
-	if err := g.client.Exec(ctx, environmentQuery, &environment, variables); err != nil {
-		return nil, err
+		variables := map[string]any{
+			"id": cfg.EnvironmentId,
+		}
+
+		if err := g.client.Exec(ctx, environmentQuery, &environment, variables); err != nil {
+			return nil, err
+		}
+
+		projectId = environment.Environment.ProjectID
 	}
 
 	project := &Project{}
 
-	variables = map[string]any{
-		"id": environment.Environment.ProjectID,
+	variables := map[string]any{
+		"id": projectId,
 	}
 
 	if err := g.client.Exec(ctx, projectQuery, &project, variables); err != nil {
@@ -81,11 +90,28 @@ var (
 )
 
 func (g *GraphQLClient) createSubscription(ctx context.Context, cfg *config.Config) (*websocket.Conn, error) {
+	var services []string
+
+	// If Train services are specified, use them. Otherwise, auto-discover services.
+	if len(cfg.Train) > 0 {
+		services = cfg.Train
+	} else if cfg.ProjectId != "" {
+		// Auto-discover all services in the environment
+		autoServices, err := g.GetAllServicesInEnvironment(ctx, cfg.ProjectId, cfg.EnvironmentId)
+		if err != nil {
+			return nil, fmt.Errorf("error auto-discovering services: %w", err)
+		}
+		services = autoServices
+		logger.Stdout.Info("auto-discovered services", slog.Any("services", services), slog.Int("count", len(services)))
+	} else {
+		return nil, errors.New("either TRAIN services must be specified or RAILWAY_PROJECT_ID must be provided for auto-discovery")
+	}
+
 	payload := &payload{
 		Query: streamEnvironmentLogsQuery,
 		Variables: &variables{
 			EnvironmentId: cfg.EnvironmentId,
-			Filter:        buildServiceFilter(cfg.Train),
+			Filter:        buildServiceFilter(services),
 
 			// needed for seamless subscription resuming
 			BeforeDate:  time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339Nano),

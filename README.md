@@ -146,19 +146,54 @@ Grafana Loki Structured Log Example
 
 -   Structured log attributes sent to Grafana Loki must always be a string
 
+## Usage Examples
+
+### Auto-Discovery Mode (Recommended)
+
+Monitor all services in a project/environment automatically:
+
+```bash
+RAILWAY_API_KEY=your_api_key
+RAILWAY_PROJECT_ID=your_project_id
+RAILWAY_ENVIRONMENT_ID=your_environment_id
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+### Legacy Mode
+
+Manually specify services to monitor:
+
+```bash
+RAILWAY_API_KEY=your_api_key
+ENVIRONMENT_ID=your_environment_id
+TRAIN=service_id_1,service_id_2,service_id_3
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
 All variables:
 
 -   `RAILWAY_API_KEY` - Your Railway API key.
 
     -   Project level keys do not work.
 
--   `ENVIRONMENT_ID` - The environment ID your service is in.
+-   `RAILWAY_PROJECT_ID` - The Railway project ID to monitor.
+
+    -   Optional. When specified together with `RAILWAY_ENVIRONMENT_ID`, the locomotive will automatically discover all services in the project/environment instead of requiring manual specification via `TRAIN`.
+
+-   `RAILWAY_ENVIRONMENT_ID` - The Railway environment ID to monitor.
+
+    -   Optional when used with `RAILWAY_PROJECT_ID` for auto-discovery mode.
+    
+-   `ENVIRONMENT_ID` - The environment ID your service is in (legacy mode).
 
     -   Auto-filled to the current environment ID.
+    -   **Legacy**: Use `RAILWAY_ENVIRONMENT_ID` instead for new deployments.
 
 -   `TRAIN` - The ID of the service you want to monitor.
 
-    -   Supports multiple service Ids, separated with a comma.
+    -   Supports multiple service IDs, separated with a comma.
+    -   **Optional when using auto-discovery mode**: If `RAILWAY_PROJECT_ID` and `RAILWAY_ENVIRONMENT_ID` are specified, all services in the project/environment will be automatically monitored.
+    -   **Required in legacy mode**: When using `ENVIRONMENT_ID`, you must specify the services to monitor.
 
 -   `DISCORD_WEBHOOK_URL` - The Discord webhook URL to send logs to.
 
@@ -209,47 +244,4 @@ All variables:
     -   Defaults to allowing all log levels.
     -   Optional.
 
--   `LOGS_FILTER_DISCORD` - Discord specific log filter.
-
-    -   Same options and behavior as the global log filter.
-
--   `LOGS_FILTER_SLACK` - Slack specific log filter.
-
-    -   Same options and behavior as the global log filter.
-
--   `LOGS_FILTER_LOKI` - Slack specific log filter.
-
-    -   Same options and behavior as the global log filter.
-
--   `LOGS_FILTER_WEBHOOK` - Ingest URL specific log filter.
-
-    -   Same options and behavior as the global log filter.
-
-## Log Filtering
-
-You can filter logs by severity level and content using the following environment variables:
-
-### Level Filters
-
--   `LOGS_FILTER`: Global level filter applied to all outputs
--   `LOGS_FILTER_DISCORD`: Level filter applied to Discord output
--   `LOGS_FILTER_SLACK`: Level filter applied to Slack output
--   `LOGS_FILTER_LOKI`: Level filter applied to Loki output
--   `LOGS_FILTER_WEBHOOK`: Level filter applied to webhook output
-
-Level filter options: ALL, INFO, ERROR, WARN, or any custom combination of severity / level.
-
-### Content Filters
-
--   `LOGS_CONTENT_FILTER`: Global content filter applied to all outputs
--   `LOGS_CONTENT_FILTER_DISCORD`: Content filter applied to Discord output
--   `LOGS_CONTENT_FILTER_SLACK`: Content filter applied to Slack output
--   `LOGS_CONTENT_FILTER_LOKI`: Content filter applied to Loki output
--   `LOGS_CONTENT_FILTER_WEBHOOK`: Content filter applied to webhook output
-
-Content filters support regular expressions or plain text searches.
-
-Examples:
-
--   "hello"
--   "[A-za-z]ello"
+-   `LOGS_FILTER_DISCORD`
